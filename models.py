@@ -97,8 +97,9 @@ class MetaNetwork:
 class MetaVAE:
     def __init__(self, num_inner_loops=5):
         k = 3
-        self.encoder_shapes = [[k, k, 1, 8], [k, k, 8, 16], [k, k, 16, 32]]
-        self.decoder_shapes = [[k, k, 16, 16], [k, k, 8, 16], [k, k, 1, 8]]
+        f = 8
+        self.encoder_shapes = [[k, k, 1, f], [k, k, f, f*2], [k, k, f*2, f*4*2]]
+        self.decoder_shapes = [[k, k, f*2, f*4], [k, k, f, f*2], [k, k, 1, f]]
         self.meta_network = MetaNetwork(self.encoder_shapes + self.decoder_shapes, num_inner_loops)
         self.inner_network = InnerVAE()
         self.num_inner_loops = num_inner_loops
@@ -146,7 +147,7 @@ class MetaVAE:
             # [MetaBatch]
             step_loss = _get_vae_loss(train_inputs, dec, enc_mean, enc_logvar)
             print("Step train loss:", step_loss)
-            print_train_loss = tf.print("Train error at step %d" % step, step_loss, summarize=5)
+            print_train_loss = tf.print("Avg train loss at step %d" % step, tf.reduce_mean(step_loss), summarize=5)
 
             # [Layers, MetaBatch, *LayerShape]
             with tf.control_dependencies([print_train_loss]):
@@ -172,7 +173,7 @@ class MetaVAE:
             # [MetaBatch]
             step_test_loss = _get_vae_loss(test_inputs, dec, enc_mean, enc_logvar)
             print("Step test loss:", step_test_loss)
-            step_test_loss = tf.Print(step_test_loss, [step_test_loss], message="Test error at step %d" % step, summarize=5)
+            step_test_loss = tf.Print(step_test_loss, [tf.reduce_mean(step_test_loss)], message="Avg test loss at step %d" % step, summarize=5)
             test_loss.append(step_test_loss)
 
         test_loss = 0.04 * test_loss[0] + 0.06 * test_loss[1] + 0.1 * test_loss[2] + 0.16 * test_loss[3] + 0.2 * test_loss[4] + 0.44 * test_loss[5] 
