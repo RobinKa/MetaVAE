@@ -36,7 +36,7 @@ def get_input_fn(path, batch_size, images_per_batch, steps):
     """
 
     print("Loading images from", path)
-    images_by_label = load_images_by_directories(path)
+    images_by_label = load_images_by_directories(path, images_per_batch)
     image_shape = images_by_label[0][0].shape
     num_labels = len(images_by_label)
     print("Loaded", num_labels, "labels and a total of", sum([len(im) for im in images_by_label]), "images")

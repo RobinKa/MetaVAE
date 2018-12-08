@@ -9,14 +9,14 @@ def _load_image(params):
     path, size = params
     return resize((imread(path) / 255.).astype(np.float32), size)
 
-def load_images_by_directories(root_path, target_size=(28, 28)):
+def load_images_by_directories(root_path, min_samples, target_size=(28, 28)):
     """Returns a list of images grouped by label. Takes the image directory as its label.
     Works with nested directories."""
     images_by_label = []
 
     with Pool() as pool:
         for root, _, filenames in tqdm(os.walk(root_path)):
-            if len(filenames) > 0:
+            if len(filenames) >= min_samples:
                 images = pool.map(_load_image, [(os.path.join(root, path), target_size) for path in filenames])
                 images_by_label.append(np.array(images))
 
