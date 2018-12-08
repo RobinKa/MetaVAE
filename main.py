@@ -10,12 +10,14 @@ def model_fn(features, labels, mode, params, config):
 
     print("Image:", image)
 
-    model = MetaVAE(num_inner_loops=1)
-    loss = None
-    train_op = None
+    model = MetaVAE(num_inner_loops=5)
+
+    loss = model.get_loss(image)
 
     if mode == tf.estimator.ModeKeys.TRAIN:
-        loss, train_op = model.get_train(image)
+        train_op = tf.train.AdamOptimizer(0.001).minimize(loss, global_step=tf.train.get_global_step())
+    else:
+        train_op = None
 
     return tf.estimator.EstimatorSpec(
         mode=mode,
@@ -41,12 +43,13 @@ def get_input_fn(path, batch_size, images_per_batch, steps):
     num_labels = len(images_by_label)
     print("Loaded", num_labels, "labels and a total of", sum([len(im) for im in images_by_label]), "images")
     print("Image shape:", image_shape)
+    print("Min / max:", np.min(images_by_label[0]), np.max(images_by_label[0]))
 
     def _get_batch():
         chosen_label = np.random.randint(num_labels)
         label_images = images_by_label[chosen_label]
         chosen_indices = np.random.choice(np.arange(len(label_images)), size=images_per_batch, replace=False)
-        images = (label_images[chosen_indices] / 255.).astype(np.float32)
+        images = label_images[chosen_indices]
         return np.expand_dims(images, -1)
 
     def input_fn():
@@ -77,10 +80,11 @@ def main():
 
     run_config = tf.estimator.RunConfig(
         model_dir="models",
+        save_summary_steps=10,
     )
 
-    train_input_fn = get_input_fn("omniglot/train", batch_size=32, images_per_batch=8, steps=10000)
-    test_input_fn = get_input_fn("omniglot/test", batch_size=32, images_per_batch=8, steps=10000)
+    train_input_fn = get_input_fn("omniglot/train", batch_size=32, images_per_batch=8, steps=1000000)
+    test_input_fn = get_input_fn("omniglot/test", batch_size=32, images_per_batch=8, steps=1000000)
 
     estimator = tf.estimator.Estimator(model_fn=model_fn, params={}, config=run_config)
 

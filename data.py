@@ -7,7 +7,7 @@ from tqdm import tqdm
 
 def _load_image(params):
     path, size = params
-    return resize((imread(path) / 255.).astype(np.float32), size)
+    return resize(imread(path), size).astype(np.float32)
 
 def load_images_by_directories(root_path, min_samples, target_size=(28, 28)):
     """Returns a list of images grouped by label. Takes the image directory as its label.
