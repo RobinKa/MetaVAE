@@ -1,6 +1,7 @@
 import tensorflow as tf
 import numpy as np
 from models import MetaVAE
+from data import load_images_by_directories
 
 def model_fn(features, labels, mode, params, config):
     image = features["image"]
@@ -23,6 +24,7 @@ def model_fn(features, labels, mode, params, config):
     )
 
 def get_input_fn(batch_size, images_per_batch, steps, augment):
+    """
     (train_images, train_labels), (test_images, test_labels) = tf.keras.datasets.fashion_mnist.load_data()
     train_images_by_label = [np.array([image for j, image in enumerate(train_images) if train_labels[j] == i]) for i in range(10)]
     image_shape = train_images[0].shape
@@ -30,6 +32,12 @@ def get_input_fn(batch_size, images_per_batch, steps, augment):
     train_labels = None
     test_images = None
     test_labels = None
+    """
+
+    train_images_by_label = load_images_by_directories("omniglot")
+    image_shape = train_images_by_label[0][0].shape
+    print("Loaded", len(train_images_by_label), "labels and a total of", sum([len(im) for im in train_images_by_label]), "images")
+    print("Image shape:", image_shape)
 
     def _get_batch():
         batch = []
