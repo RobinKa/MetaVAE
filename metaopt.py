@@ -22,7 +22,7 @@ class MetaVAE:
 
         self.input_shape = input_shape
 
-        self.inner_vae = InnerVAE()
+        self.inner_vae = InnerVAE(int(input_shape[-1]))
 
         # Warmup the inner network so the layers are built and 
         # we can collect the inner variables needed for the
@@ -38,6 +38,7 @@ class MetaVAE:
         self.trainable_inner_vars = il.get_trainable_inner_variables(self.inner_vae)
 
         self.outer_network = OuterConvNetwork(self.inner_vars, num_inner_loops=self.num_inner_loops)
+        print("Num inner trainable vars:", self.outer_network.output_size)
 
 
     def get_loss(self, train_inputs, test_inputs):
@@ -70,6 +71,8 @@ class MetaVAE:
             for inner_var in self.trainable_inner_vars
         }
 
+        step = 0
+
         # Create the inner variable getter method.
         # Must make sure that the step variable exists (created in loop below).
         def _get_inner_var(inner_var, batch_index):
@@ -96,7 +99,12 @@ class MetaVAE:
             mutable_inner_vars_keys, mutable_inner_vars_values = list(mutable_inner_vars.keys()), list(mutable_inner_vars.values())
             mutable_inner_vars_grads = tf.gradients(loss_dict["loss"], mutable_inner_vars_values)
             for inner_var, weights, grads in zip(mutable_inner_vars_keys, mutable_inner_vars_values, mutable_inner_vars_grads):
-                mutable_inner_vars[inner_var] = weights - 0.01 * grads
+                # Grads can be none if the inner var is per step.
+                # Make sure that this is the cause of it being None.
+                if grads is not None:
+                    mutable_inner_vars[inner_var] = weights - 0.3 * grads
+                else:
+                    assert inner_var.per_step
         
             # Calculate test loss for this step
             loss_dict = self.inner_vae.get_loss(test_inputs)
@@ -110,5 +118,6 @@ class MetaVAE:
         latents = self.inner_vae.sample_normal(tf.zeros_like(loss_dict["latents"]), tf.ones_like(loss_dict["latents"]))
         samples = tf.nn.sigmoid(self.inner_vae.decode(latents))
         _image_summary("random_samples", samples)
+        print("Latents shape:", latents.shape)
 
         return test_loss_total

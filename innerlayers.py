@@ -21,7 +21,6 @@ def warmup_inner_layer(layer, input_shape):
     inner_batch_size = 1
     dummy_input = tf.placeholder(tf.float32, (outer_batch_size, inner_batch_size, *input_shape))
     layer(dummy_input)
-    #layer.build((outer_batch_size, inner_batch_size, *input_shape))
 
 class InnerVariable:
     counter = 0
@@ -46,10 +45,10 @@ class InnerLayer(tf.keras.layers.Layer):
         super().__init__()
         self.inner_variables = {}
 
-    def create_inner_variable(self, name, shape, dtype=tf.float32):
+    def create_inner_variable(self, name, shape, dtype=tf.float32, per_step=False):
         if name in self.inner_variables:
             raise Exception("Tried to create inner variable with existing name")
-        self.inner_variables[name] = InnerVariable(shape=shape, dtype=dtype)
+        self.inner_variables[name] = InnerVariable(shape=shape, dtype=dtype, per_step=per_step)
         return self.inner_variables[name]
 
     def call(self, inputs):
@@ -129,10 +128,36 @@ class InnerConv2DTranspose(InnerLayer):
 
         # TODO: Correct padding values
         padding = (0, 0) if self.padding == "VALID" else (1000, 1000)
-        
+
         output_shape = list(input_shape)
         output_shape[-3] = (input_shape[-3] - 1) * self.strides[1] + self.kernel_size[0] - 2 * padding[0]
         output_shape[-2] = (input_shape[-2] - 1) * self.strides[2] + self.kernel_size[1] - 2 * padding[1]
         output_shape[-1] = self.filters
         
         return tuple(output_shape)
+
+class InnerNormalization(InnerLayer):
+    def __init__(self, per_step=True):
+        super().__init__()
+        self.per_step = per_step
+
+    def build(self, input_shape):
+        self.std = self.create_inner_variable("std", (1, *input_shape[-3:-1], 1), per_step=self.per_step)
+        self.mean = self.create_inner_variable("mean", (1, *input_shape[-3:-1], 1), per_step=self.per_step)
+
+    def call_single(self, inputs, batch_index):
+        std = self.std.get(batch_index)
+        mean = self.mean.get(batch_index)
+        output = std * inputs + mean
+        return output
+
+    def call(self, inputs):
+        # Normalize to N(0, 1) over last axis together.
+        # Then do the single-call normalization since every
+        # inner batch has its own mean and std
+        inputs_mean, inputs_var = tf.nn.moments(inputs, axes=[-1], keep_dims=True)
+        inputs = (inputs - inputs_mean) / tf.sqrt(inputs_var + 1e-6)
+        return super().call(inputs)
+
+    def compute_output_shape(self, input_shape):
+        return input_shape

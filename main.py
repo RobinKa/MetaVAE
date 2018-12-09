@@ -26,7 +26,7 @@ def model_fn(features, labels, mode, params, config):
 
 def get_input_fn(path, batch_size, images_per_batch, steps=100000000):
     print("Loading images from", path)
-    images_by_label = load_images_by_directories(path, images_per_batch, target_size=(28, 28))
+    images_by_label = load_images_by_directories(path, images_per_batch, target_size=(32, 32, 3))
     image_shape = images_by_label[0][0].shape
     num_labels = len(images_by_label)
     print("Loaded", num_labels, "labels and a total of", sum([len(im) for im in images_by_label]), "images")
@@ -38,12 +38,14 @@ def get_input_fn(path, batch_size, images_per_batch, steps=100000000):
         label_images = images_by_label[chosen_label]
         chosen_indices = np.random.choice(np.arange(len(label_images)), size=images_per_batch, replace=False)
         images = label_images[chosen_indices]
-        return np.expand_dims(images, -1)
+        if len(images.shape) == 3:
+            images = np.expand_dims(images, -1)
+        return images
 
     def input_fn():
         def f(d):
             ff = tf.py_func(_get_batch, [], tf.float32)
-            ff.set_shape((images_per_batch, *image_shape, 1))
+            ff.set_shape((images_per_batch, *image_shape))
             return ff
 
         dummy = tf.constant(0, shape=(steps,))
