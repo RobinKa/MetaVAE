@@ -2,6 +2,15 @@ import tensorflow as tf
 import innerlayers as il
 from outernetwork import OuterNetwork
 
+class OuterConstantNetwork(OuterNetwork):
+    def __init__(self, inner_variables, num_inner_loops):
+        super().__init__(inner_variables=inner_variables, num_inner_loops=num_inner_loops)
+        self.constant_init = tf.get_variable("inner_init", (self.output_size,), dtype=tf.float32, trainable=True)
+
+    def calculate_output(self, inputs):
+        batch_size = tf.shape(inputs)[0]
+        self.output = tf.tile(tf.expand_dims(self.constant_init, 0), (batch_size, 1))
+
 class OuterConvNetwork(OuterNetwork):
     def __init__(self, inner_variables, num_inner_loops):
         super().__init__(inner_variables=inner_variables, num_inner_loops=num_inner_loops)

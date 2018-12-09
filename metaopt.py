@@ -1,7 +1,7 @@
 import tensorflow as tf
 import numpy as np
 import innerlayers as il
-from networks import OuterConvNetwork, InnerVAE
+from networks import OuterConvNetwork, OuterConstantNetwork, InnerVAE
 
 class MetaVAE:
     def __init__(self, num_inner_loops=5):
@@ -37,7 +37,8 @@ class MetaVAE:
         # then we can not mutate it.
         self.trainable_inner_vars = il.get_trainable_inner_variables(self.inner_vae)
 
-        self.outer_network = OuterConvNetwork(self.inner_vars, num_inner_loops=self.num_inner_loops)
+        #self.outer_network = OuterConvNetwork(self.inner_vars, num_inner_loops=self.num_inner_loops)
+        self.outer_network = OuterConstantNetwork(self.inner_vars, num_inner_loops=self.num_inner_loops)
         print("Num inner trainable vars:", self.outer_network.output_size)
 
 
