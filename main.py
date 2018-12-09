@@ -75,9 +75,14 @@ def main():
 
     tf.logging.set_verbosity(tf.logging.INFO)
 
+    session_config = tf.ConfigProto()
+    session_config.gpu_options.allow_growth = True
+    session_config.allow_soft_placement = True
+
     run_config = tf.estimator.RunConfig(
         model_dir=params.model_path,
         save_summary_steps=50,
+        session_config=session_config,
     )
 
     estimator = tf.estimator.Estimator(model_fn=model_fn, params=params, config=run_config)
