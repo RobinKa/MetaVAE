@@ -1,21 +1,19 @@
 import tensorflow as tf
 import numpy as np
-from models import MetaVAE
+from metaopt import MetaVAE
 from data import load_images_by_directories
+import argparse
 
 def model_fn(features, labels, mode, params, config):
-    print("Features:", features)
-    image = features
-    #image.set_shape([32, 6, 28, 28, 1])
+    inputs = features
+    inputs.set_shape((params.outer_batch_size, *inputs.shape[1:]))
 
-    print("Image:", image)
+    model = MetaVAE(num_inner_loops=params.num_inner_loops)
 
-    model = MetaVAE(num_inner_loops=5)
-
-    loss = model.get_loss(image)
+    loss = model.get_loss(inputs[:, :params.inner_train_size], inputs[:, params.inner_train_size:])
 
     if mode == tf.estimator.ModeKeys.TRAIN:
-        train_op = tf.train.AdamOptimizer(0.001).minimize(loss, global_step=tf.train.get_global_step())
+        train_op = tf.train.AdamOptimizer(params.outer_learning_rate).minimize(loss, global_step=tf.train.get_global_step())
     else:
         train_op = None
 
@@ -26,19 +24,9 @@ def model_fn(features, labels, mode, params, config):
         train_op=train_op,
     )
 
-def get_input_fn(path, batch_size, images_per_batch, steps):
-    """
-    (train_images, train_labels), (test_images, test_labels) = tf.keras.datasets.fashion_mnist.load_data()
-    train_images_by_label = [np.array([image for j, image in enumerate(train_images) if train_labels[j] == i]) for i in range(10)]
-    image_shape = train_images[0].shape
-    train_images = None
-    train_labels = None
-    test_images = None
-    test_labels = None
-    """
-
+def get_input_fn(path, batch_size, images_per_batch, steps=100000000):
     print("Loading images from", path)
-    images_by_label = load_images_by_directories(path, images_per_batch)
+    images_by_label = load_images_by_directories(path, images_per_batch, target_size=(28, 28))
     image_shape = images_by_label[0][0].shape
     num_labels = len(images_by_label)
     print("Loaded", num_labels, "labels and a total of", sum([len(im) for im in images_by_label]), "images")
@@ -58,40 +46,49 @@ def get_input_fn(path, batch_size, images_per_batch, steps):
             ff.set_shape((images_per_batch, *image_shape, 1))
             return ff
 
-        # [ImagesPerBatch, *ImageShape]
         dummy = tf.constant(0, shape=(steps,))
         dataset = tf.data.Dataset.from_tensor_slices(dummy)
         dataset = dataset.map(f)
-        # [BatchSize, ImagesPerBatch, *ImageShape]
-        #dataset = dataset.repeat(steps)
         dataset = dataset.batch(batch_size)
         dataset = dataset.prefetch(2)
 
         print("Dataset:", dataset)
-
         return dataset
+
     return input_fn
 
 def main():
-    tf.enable_eager_execution()
-    tf.executing_eagerly() 
+    args = argparse.ArgumentParser()
+    args.add_argument("-ob", "--outer_batch_size", type=int, default=32, help="Outer batch size")
+    args.add_argument("-ib", "--inner_batch_size", type=int, default=8, help="Inner batch size")
+    args.add_argument("-it", "--inner_train_size", type=int, default=5, help="Inner train batch size (must be smaller less inner_batch_size)")
+    args.add_argument("-d", "--dataset_path", type=str, default="omniglot/train", help="Path to dataset (images in same folder will be treated as same label)")
+    args.add_argument("-dt", "--dataset_test_path", type=str, default=None, help="Path to test dataset (images in same folder will be treated as same label). No testing is done if None.")
+    args.add_argument("-m", "--model_path", type=str, default="models", help="Estimator model path. Will load existing models. Also saves tensorboard summaries to the same directory.")
+    args.add_argument("-il", "--num_inner_loops", type=int, default=5, help="Number of inner network optimization steps.")
+    args.add_argument("-olr", "--outer_learning_rate", type=float, default=0.001, help="Learning rate for the outer network.")
+    params = args.parse_args()
+
+    print("Params:", params)
 
     tf.logging.set_verbosity(tf.logging.INFO)
 
     run_config = tf.estimator.RunConfig(
-        model_dir="models",
-        save_summary_steps=10,
+        model_dir=params.model_path,
+        save_summary_steps=50,
     )
 
-    train_input_fn = get_input_fn("omniglot/train", batch_size=32, images_per_batch=8, steps=1000000)
-    test_input_fn = get_input_fn("omniglot/test", batch_size=32, images_per_batch=8, steps=1000000)
+    estimator = tf.estimator.Estimator(model_fn=model_fn, params=params, config=run_config)
 
-    estimator = tf.estimator.Estimator(model_fn=model_fn, params={}, config=run_config)
+    train_input_fn = get_input_fn(params.dataset_path, batch_size=params.outer_batch_size, images_per_batch=params.inner_batch_size)
 
-    train_spec = tf.estimator.TrainSpec(train_input_fn)
-    eval_spec = tf.estimator.EvalSpec(test_input_fn)
-
-    tf.estimator.train_and_evaluate(estimator, train_spec, eval_spec)
+    if params.dataset_test_path is None:
+        estimator.train(train_input_fn)
+    else:
+        test_input_fn = get_input_fn(params.dataset_test_path, batch_size=params.outer_batch_size, images_per_batch=params.inner_batch_size)
+        train_spec = tf.estimator.TrainSpec(train_input_fn)
+        eval_spec = tf.estimator.EvalSpec(test_input_fn)
+        tf.estimator.train_and_evaluate(estimator, train_spec, eval_spec)
 
 
 if __name__ == "__main__":
