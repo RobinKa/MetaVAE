@@ -98,7 +98,7 @@ class InnerVAE(tf.keras.layers.Layer):
         mean, logvar = self.encode(inputs)
         latents = self.sample_normal(mean, logvar)
         reconstr = self.decode(latents)
-        bce = tf.nn.sigmoid_cross_entropy_with_logits(labels=inputs, logits=reconstr)
+        bce = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=inputs, logits=reconstr))
         kld = -0.5 * tf.reduce_mean(1 + logvar - tf.square(mean) - tf.exp(logvar), axis=[1, 2, 3, 4])
         return kld + bce
 
