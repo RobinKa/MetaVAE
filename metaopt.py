@@ -50,6 +50,12 @@ class MetaVAE:
         def _avg_scalar_summary(name, values):
             tf.summary.scalar(name, tf.reduce_mean(values))
 
+        def _loss_dict_summary(suffix, loss_dict):
+            _avg_scalar_summary("%s_%s" %  ("loss", suffix), loss_dict["loss"])
+            _avg_scalar_summary("%s_%s" %  ("loss_bce", suffix), loss_dict["bce"])
+            _avg_scalar_summary("%s_%s" %  ("loss_kld", suffix), loss_dict["kld"])
+            _image_summary("%s_%s" %  ("reconstruction", suffix), loss_dict["reconstruction"])
+
         # Keep initial and step test losses and average them
         # in the end.
         test_losses = []
@@ -77,26 +83,32 @@ class MetaVAE:
             inner_var.getter = _get_inner_var
 
         # Calculate initial test loss
-        initial_test_loss = self.inner_vae.get_loss(test_inputs)
-        test_losses.append(initial_test_loss)
-        _avg_scalar_summary("test_loss_initial", initial_test_loss)
+        loss_dict = self.inner_vae.get_loss(test_inputs)
+        test_losses.append(loss_dict["loss"])
+        _loss_dict_summary("initial", loss_dict)
         _image_summary("test_input", test_inputs)
 
         for step in range(self.num_inner_loops):
             # Calculate train loss for this step
-            step_train_loss = self.inner_vae.get_loss(train_inputs)
+            loss_dict = self.inner_vae.get_loss(train_inputs)
 
             # Mutable inner variable gradient update using train loss for this step
             mutable_inner_vars_keys, mutable_inner_vars_values = list(mutable_inner_vars.keys()), list(mutable_inner_vars.values())
-            mutable_inner_vars_grads = tf.gradients(step_train_loss, mutable_inner_vars_values)
+            mutable_inner_vars_grads = tf.gradients(loss_dict["loss"], mutable_inner_vars_values)
             for inner_var, weights, grads in zip(mutable_inner_vars_keys, mutable_inner_vars_values, mutable_inner_vars_grads):
                 mutable_inner_vars[inner_var] = weights - 0.01 * grads
         
             # Calculate test loss for this step
-            step_test_loss = self.inner_vae.get_loss(test_inputs)
-            test_losses.append(step_test_loss)
-            _avg_scalar_summary("test_loss_step_%d" % step, step_test_loss)
+            loss_dict = self.inner_vae.get_loss(test_inputs)
+            test_losses.append(loss_dict["loss"])
+            _loss_dict_summary("step_%d" % step, loss_dict)
 
         test_loss_total = tf.reduce_mean(test_losses)
         _avg_scalar_summary("test_loss_total", test_loss_total)
+
+        # Sample summaries
+        latents = self.inner_vae.sample_normal(tf.zeros_like(loss_dict["latents"]), tf.ones_like(loss_dict["latents"]))
+        samples = tf.nn.sigmoid(self.inner_vae.decode(latents))
+        _image_summary("random_samples", samples)
+
         return test_loss_total
