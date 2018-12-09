@@ -46,7 +46,6 @@ class InnerVAEEncoder(tf.keras.layers.Layer):
         self.layers = []
 
         self.down_convs = tf.keras.models.Sequential([
-            il.InnerNormalization(),
             il.InnerConv2D(16, 4, (1, 1)),
             tf.keras.layers.LeakyReLU(0.2),
 
@@ -63,11 +62,11 @@ class InnerVAEEncoder(tf.keras.layers.Layer):
             tf.keras.layers.LeakyReLU(0.2),
 
             il.InnerNormalization(),
-            il.InnerConv2D(16, 4, (2, 2)),
-            tf.keras.layers.LeakyReLU(0.2),
+            il.InnerConv2D(8*2, 4, (2, 2)),
+            #tf.keras.layers.LeakyReLU(0.2),
 
-            il.InnerNormalization(),
-            il.InnerConv2D(16*2, 4, (1, 1)),
+            #il.InnerNormalization(),
+            #il.InnerConv2D(16*2, 4, (1, 1)),
         ])
 
         self.layers.append(self.down_convs)
@@ -86,11 +85,11 @@ class InnerVAEDecoder(tf.keras.layers.Layer):
         self.layers = []
 
         self.up_convs = tf.keras.models.Sequential([
-            il.InnerConv2DTranspose(16, 4, (1, 1)),
-            tf.keras.layers.LeakyReLU(0.2),
+            #il.InnerConv2DTranspose(16, 4, (1, 1)),
+            #tf.keras.layers.LeakyReLU(0.2),
 
             il.InnerNormalization(),
-            il.InnerConv2DTranspose(16, 4, (2, 2)),
+            il.InnerConv2DTranspose(8, 4, (2, 2)),
             tf.keras.layers.LeakyReLU(0.2),
 
             il.InnerNormalization(),
