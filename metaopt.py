@@ -103,7 +103,6 @@ class MetaVAE:
                 lr = self.outer_network.get_learning_rate(inner_var, step)
                 assert not inner_var.per_step
                 if grads is not None:
-                    mutable_inner_vars[inner_var] = weights - 0.3 * grads
                     mutable_inner_vars[inner_var] = weights - lr * grads
                 else:
                     raise Exception("Grads none for %s (tensor: %s) (unused inner variable?)" % (inner_var.name, weights))
