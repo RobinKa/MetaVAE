@@ -9,7 +9,7 @@ def get_inner_variables(layer, match_fn=None):
 
     if hasattr(layer, "layers"):
         for child_layer in layer.layers:
-            inner_variables += get_inner_variables(child_layer)
+            inner_variables += get_inner_variables(child_layer, match_fn)
 
     return list(set(inner_variables))
 
