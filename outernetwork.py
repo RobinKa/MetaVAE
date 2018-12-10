@@ -9,12 +9,14 @@ class OuterNetwork:
         self.inner_var_index = {}
         self.inner_var_lr_index = {}
         index = 0
+        num_vars = num_inner_loops + 1 # We need one more variable than steps since the final network will need variables too
         for inner_var in inner_variables:
             inner_var_size = np.prod(inner_var.shape)
             self.inner_var_index[inner_var] = []
-            for step in range(num_inner_loops):
+            
+            for step in range(num_vars):
                 self.inner_var_index[inner_var].append(index)
-                if inner_var.per_step or step + 1 == num_inner_loops:
+                if inner_var.per_step or step + 1 == num_vars:
                     index += inner_var_size
 
             if fixed_lr is None and not inner_var.per_step:
@@ -31,7 +33,7 @@ class OuterNetwork:
         Returns one variable for every outer batch.
         [OuterBatchSize, *VariableShape]
         """
-        assert self.output is not None
+        assert self.output is not None and step >= 0 and step <= self.num_inner_loops
 
         outer_batch_size = tf.shape(self.output)[0]
         start_index = self.inner_var_index[inner_variable][step]
@@ -39,7 +41,7 @@ class OuterNetwork:
         return tf.reshape(self.output[:, start_index:end_index], (outer_batch_size, *inner_variable.shape))
 
     def get_learning_rate(self, inner_variable, step):
-        assert self.output is not None and not inner_variable.per_step and step < self.num_inner_loops
+        assert self.output is not None and not inner_variable.per_step and step >= 0 and step < self.num_inner_loops
 
         if self.fixed_lr is None:
             outer_batch_size = tf.shape(self.output)[0]

@@ -86,15 +86,17 @@ class MetaVAE:
         for inner_var in self.inner_vars:
             inner_var.getter = _get_inner_var
 
-        # Calculate initial test loss
-        loss_dict = self.inner_vae.get_loss(test_inputs)
-        test_losses.append(loss_dict["loss"])
-        _loss_dict_summary("initial", loss_dict)
+        # Test image summary
         _image_summary("test_input", test_inputs)
 
         for step in range(self.num_inner_loops):
             # Calculate train loss for this step
             loss_dict = self.inner_vae.get_loss(train_inputs)
+
+            # Calculate test loss for this step
+            test_loss_dict = self.inner_vae.get_loss(test_inputs)
+            test_losses.append(test_loss_dict["loss"])
+            _loss_dict_summary("step_%d" % step, test_loss_dict)
 
             # Mutable inner variable gradient update using train loss for this step
             mutable_inner_vars_keys, mutable_inner_vars_values = list(mutable_inner_vars.keys()), list(mutable_inner_vars.values())
@@ -107,16 +109,18 @@ class MetaVAE:
                 else:
                     raise Exception("Grads none for %s (tensor: %s) (unused inner variable?)" % (inner_var.name, weights))
 
-            # Calculate test loss for this step
-            loss_dict = self.inner_vae.get_loss(test_inputs)
-            test_losses.append(loss_dict["loss"])
-            _loss_dict_summary("step_%d" % step, loss_dict)
+        # Calculate final test loss
+        step = self.num_inner_loops
+        self.inner_vae.get_loss(train_inputs) # Run on train set to get batch statistics
+        test_loss_dict = self.inner_vae.get_loss(test_inputs)
+        test_losses.append(test_loss_dict["loss"])
+        _loss_dict_summary("final", test_loss_dict)
 
         test_loss_total = tf.reduce_mean(test_losses)
         _avg_scalar_summary("test_loss_total", test_loss_total)
 
         # Sample summaries
-        latents = self.inner_vae.sample_normal(tf.zeros_like(loss_dict["latents"]), tf.ones_like(loss_dict["latents"]))
+        latents = self.inner_vae.sample_normal(tf.zeros_like(test_loss_dict["latents"]), tf.ones_like(test_loss_dict["latents"]))
         samples = tf.nn.sigmoid(self.inner_vae.decode(latents))
         _image_summary("random_samples", samples)
         print("Latents shape:", latents.shape)
