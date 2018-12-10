@@ -3,8 +3,8 @@ import innerlayers as il
 from outernetwork import OuterNetwork
 
 class OuterConstantNetwork(OuterNetwork):
-    def __init__(self, inner_variables, num_inner_loops):
-        super().__init__(inner_variables=inner_variables, num_inner_loops=num_inner_loops)
+    def __init__(self, inner_variables, num_inner_loops, fixed_lr=None):
+        super().__init__(inner_variables=inner_variables, num_inner_loops=num_inner_loops, fixed_lr=fixed_lr)
         self.constant_init = tf.get_variable("inner_init", (self.output_size,), dtype=tf.float32, trainable=True)
 
     def calculate_output(self, inputs):

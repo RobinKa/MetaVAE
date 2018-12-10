@@ -100,9 +100,11 @@ class MetaVAE:
             mutable_inner_vars_keys, mutable_inner_vars_values = list(mutable_inner_vars.keys()), list(mutable_inner_vars.values())
             mutable_inner_vars_grads = tf.gradients(loss_dict["loss"], mutable_inner_vars_values)
             for inner_var, weights, grads in zip(mutable_inner_vars_keys, mutable_inner_vars_values, mutable_inner_vars_grads):
+                lr = self.outer_network.get_learning_rate(inner_var, step)
                 assert not inner_var.per_step
                 if grads is not None:
                     mutable_inner_vars[inner_var] = weights - 0.3 * grads
+                    mutable_inner_vars[inner_var] = weights - lr * grads
                 else:
                     raise Exception("Grads none for %s (tensor: %s) (unused inner variable?)" % (inner_var.name, weights))
 
