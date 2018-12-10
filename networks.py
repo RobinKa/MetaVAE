@@ -98,15 +98,15 @@ class InnerVAEDecoder(tf.keras.layers.Layer):
             #tf.keras.layers.LeakyReLU(0.2),
 
             #il.InnerNormalization(),
-            il.InnerConv2DTranspose(16, 4, (2, 2), use_bias=True),
+            il.InnerConv2DTranspose(32, 4, (2, 2), use_bias=True),
             tf.keras.layers.LeakyReLU(0.2),
 
             #il.InnerNormalization(),
-            il.InnerConv2DTranspose(16, 4, (2, 2), use_bias=True),
+            il.InnerConv2DTranspose(32, 4, (2, 2), use_bias=True),
             tf.keras.layers.LeakyReLU(0.2),
 
             il.InnerNormalization(),
-            il.InnerConv2DTranspose(8, 4, (1, 1), use_bias=True),
+            il.InnerConv2DTranspose(16, 4, (1, 1), use_bias=True),
             tf.keras.layers.LeakyReLU(0.2),
 
             #il.InnerNormalization(),
