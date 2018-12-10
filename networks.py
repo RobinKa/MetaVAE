@@ -94,26 +94,22 @@ class InnerVAEDecoder(tf.keras.layers.Layer):
         self.layers = []
 
         self.up_convs = tf.keras.models.Sequential([
-            #il.InnerConv2DTranspose(16, 4, (1, 1)),
+            #il.InnerConv2DTranspose(4, 4, (2, 2), use_bias=False),
             #tf.keras.layers.LeakyReLU(0.2),
 
-            il.InnerNormalization(),
-            il.InnerConv2DTranspose(8, 4, (2, 2)),
+            #il.InnerNormalization(),
+            il.InnerConv2DTranspose(16, 4, (2, 2), use_bias=True),
+            tf.keras.layers.LeakyReLU(0.2),
+
+            #il.InnerNormalization(),
+            il.InnerConv2DTranspose(16, 4, (2, 2), use_bias=True),
             tf.keras.layers.LeakyReLU(0.2),
 
             il.InnerNormalization(),
-            il.InnerConv2DTranspose(16, 3, (1, 1)),
+            il.InnerConv2DTranspose(8, 4, (1, 1), use_bias=True),
             tf.keras.layers.LeakyReLU(0.2),
 
-            il.InnerNormalization(),
-            il.InnerConv2DTranspose(16, 4, (2, 2)),
-            tf.keras.layers.LeakyReLU(0.2),
-
-            il.InnerNormalization(),
-            il.InnerConv2DTranspose(16, 4, (1, 1)),
-            tf.keras.layers.LeakyReLU(0.2),
-
-            il.InnerNormalization(),
+            #il.InnerNormalization(),
             il.InnerConv2DTranspose(output_channels, 4, (1, 1)),
         ])
 
