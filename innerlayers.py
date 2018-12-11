@@ -193,7 +193,7 @@ class InnerNormalization(InnerLayer):
         self.mean = self.create_inner_variable("mean", (input_shape[-1],), per_step=self.per_step)
 
     def call_single(self, inputs, batch_index):
-        std = self.std.get(batch_index)
+        std = self.std.get(batch_index) + 1
         mean = self.mean.get(batch_index)
         output = std * inputs + mean
         return output
