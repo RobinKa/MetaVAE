@@ -11,21 +11,31 @@ class OuterConstantNetwork(OuterNetwork):
         batch_size = tf.shape(inputs)[0]
         self.output = tf.tile(tf.expand_dims(self.constant_init, 0), (batch_size, 1))
 
+class OuterLinearNetwork(OuterNetwork):
+    def __init__(self, inner_variables, num_inner_loops):
+        super().__init__(inner_variables=inner_variables, num_inner_loops=num_inner_loops)
+        self.dense = tf.keras.layers.Dense(self.output_size)
+
+    def calculate_output(self, inputs):
+        batch_size = tf.shape(inputs)[0]
+        inputs = tf.reshape(inputs, (batch_size, -1))
+        self.output = self.dense(inputs)
+
 class OuterConvNetwork(OuterNetwork):
     def __init__(self, inner_variables, num_inner_loops):
         super().__init__(inner_variables=inner_variables, num_inner_loops=num_inner_loops)
 
-        self.conv1 = tf.keras.layers.Conv2D(64, kernel_size=(3, 3), strides=(2, 2), padding="VALID", activation=tf.keras.layers.LeakyReLU(0.2))
-        self.conv11 = tf.keras.layers.Conv2D(64, kernel_size=(1, 1), strides=(1, 1), padding="VALID", activation=tf.keras.layers.LeakyReLU(0.2))
+        self.conv1 = tf.keras.layers.Conv2D(32, kernel_size=(3, 3), strides=(2, 2), padding="VALID", activation=tf.keras.layers.LeakyReLU(0.2))
+        self.conv11 = tf.keras.layers.Conv2D(32, kernel_size=(1, 1), strides=(1, 1), padding="VALID", activation=tf.keras.layers.LeakyReLU(0.2))
         self.bn1 = tf.keras.layers.BatchNormalization()
-        self.conv2 = tf.keras.layers.Conv2D(128, kernel_size=(3, 3), strides=(2, 2), padding="VALID", activation=tf.keras.layers.LeakyReLU(0.2))
-        self.conv21 = tf.keras.layers.Conv2D(128, kernel_size=(1, 1), strides=(1, 1), padding="VALID", activation=tf.keras.layers.LeakyReLU(0.2))
+        self.conv2 = tf.keras.layers.Conv2D(64, kernel_size=(3, 3), strides=(2, 2), padding="VALID", activation=tf.keras.layers.LeakyReLU(0.2))
+        self.conv21 = tf.keras.layers.Conv2D(64, kernel_size=(1, 1), strides=(1, 1), padding="VALID", activation=tf.keras.layers.LeakyReLU(0.2))
         self.bn2 = tf.keras.layers.BatchNormalization()
-        self.conv3 = tf.keras.layers.Conv2D(256, kernel_size=(3, 3), strides=(2, 2), padding="VALID", activation=tf.keras.layers.LeakyReLU(0.2))
-        self.conv31 = tf.keras.layers.Conv2D(256, kernel_size=(1, 1), strides=(1, 1), padding="VALID", activation=tf.keras.layers.LeakyReLU(0.2))
+        self.conv3 = tf.keras.layers.Conv2D(128, kernel_size=(3, 3), strides=(2, 2), padding="VALID", activation=tf.keras.layers.LeakyReLU(0.2))
+        self.conv31 = tf.keras.layers.Conv2D(128, kernel_size=(1, 1), strides=(1, 1), padding="VALID", activation=tf.keras.layers.LeakyReLU(0.2))
         self.bn3 = tf.keras.layers.BatchNormalization()
 
-        self.dense1 = tf.keras.layers.Dense(1024, activation=tf.keras.layers.LeakyReLU(0.2))
+        self.dense1 = tf.keras.layers.Dense(256, activation=tf.keras.layers.LeakyReLU(0.2))
         self.dense2 = tf.keras.layers.Dense(self.output_size)
 
     def calculate_output(self, inputs):
@@ -55,36 +65,42 @@ class InnerVAEEncoder(tf.keras.layers.Layer):
         self.layers = []
 
         self.down_convs = tf.keras.models.Sequential([
-            il.InnerConv2D(16, 4, (1, 1)),
-            tf.keras.layers.LeakyReLU(0.2),
-
+            il.InnerConv2D(32, 2, (1, 1), use_bias=False),
             il.InnerNormalization(),
-            il.InnerConv2D(16, 4, (1, 1)),
             tf.keras.layers.LeakyReLU(0.2),
+            # (32 - 2) + 1 = 31
 
+            il.InnerConv2D(32, 3, (2, 2), use_bias=False),
             il.InnerNormalization(),
-            il.InnerConv2D(16, 4, (2, 2)),
             tf.keras.layers.LeakyReLU(0.2),
+            # (31 - 3) / 2 + 1 = 15
 
+            il.InnerConv2D(32, 3, (2, 2), use_bias=False),
             il.InnerNormalization(),
-            il.InnerConv2D(16, 3, (1, 1)),
             tf.keras.layers.LeakyReLU(0.2),
+            # (15 - 3) / 2 + 1 = 7
 
+            il.InnerConv2D(32, 3, (2, 2), use_bias=False),
             il.InnerNormalization(),
-            il.InnerConv2D(8*2, 4, (2, 2)),
-            #tf.keras.layers.LeakyReLU(0.2),
+            tf.keras.layers.LeakyReLU(0.2),
+            # (7 - 3) / 2 + 1 = 3
 
-            #il.InnerNormalization(),
-            #il.InnerConv2D(16*2, 4, (1, 1)),
+            il.InnerConv2D(32, 3, (1, 1), use_bias=False),
+            il.InnerNormalization(),
+            tf.keras.layers.LeakyReLU(0.2),
+            # (3 - 3) / 2 + 1 = 1
+
+            il.InnerReshape((32,)),
+            il.InnerDense(20)
         ])
 
         self.layers.append(self.down_convs)
 
     def call(self, inputs):
         output = self.down_convs(inputs)
-        half_output_filters = output.shape[-1] // 2
-        mean = output[:, :, :, :, :half_output_filters]
-        logvar = output[:, :, :, :, half_output_filters:]
+        half_output = output.shape[-1] // 2
+        mean = output[:, :, :half_output]
+        logvar = output[:, :, half_output:]
         return mean, logvar
 
 class InnerVAEDecoder(tf.keras.layers.Layer):
@@ -94,23 +110,28 @@ class InnerVAEDecoder(tf.keras.layers.Layer):
         self.layers = []
 
         self.up_convs = tf.keras.models.Sequential([
-            #il.InnerConv2DTranspose(4, 4, (2, 2), use_bias=False),
-            #tf.keras.layers.LeakyReLU(0.2),
-
-            #il.InnerNormalization(),
-            il.InnerConv2DTranspose(32, 4, (2, 2), use_bias=True),
-            tf.keras.layers.LeakyReLU(0.2),
-
-            #il.InnerNormalization(),
-            il.InnerConv2DTranspose(32, 4, (2, 2), use_bias=True),
-            tf.keras.layers.LeakyReLU(0.2),
-
+            il.InnerDense(32, use_bias=False),
+            il.InnerReshape((1, 1, 32)),
             il.InnerNormalization(),
-            il.InnerConv2DTranspose(16, 4, (1, 1), use_bias=True),
+            tf.keras.layers.LeakyReLU(0.2),
+            
+            il.InnerConv2DTranspose(32, 3, (1, 1), use_bias=False),
+            il.InnerNormalization(),
             tf.keras.layers.LeakyReLU(0.2),
 
-            #il.InnerNormalization(),
-            il.InnerConv2DTranspose(output_channels, 4, (1, 1)),
+            il.InnerConv2DTranspose(32, 3, (2, 2), use_bias=False),
+            il.InnerNormalization(),
+            tf.keras.layers.LeakyReLU(0.2),
+
+            il.InnerConv2DTranspose(32, 3, (2, 2), use_bias=False),
+            il.InnerNormalization(),
+            tf.keras.layers.LeakyReLU(0.2),
+
+            il.InnerConv2DTranspose(32, 3, (2, 2), use_bias=False),
+            il.InnerNormalization(),
+            tf.keras.layers.LeakyReLU(0.2),
+
+            il.InnerConv2DTranspose(output_channels, 2, (1, 1), use_bias=True),
         ])
 
         self.layers.append(self.up_convs)
@@ -141,7 +162,8 @@ class InnerVAE(tf.keras.layers.Layer):
         latents = self.sample_normal(mean, logvar)
         reconstr = self.decode(latents)
         bce = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=inputs, logits=reconstr), axis=[1, 2, 3, 4])
-        kld = -0.5 * tf.reduce_mean(1 + logvar - tf.square(mean) - tf.exp(logvar), axis=[1, 2, 3, 4])
+        #bce = tf.reduce_mean(tf.abs(inputs - tf.nn.sigmoid(reconstr)), axis=list(range(1, len(inputs.shape))))
+        kld = -0.5 * tf.reduce_mean(1 + logvar - tf.square(mean) - tf.exp(logvar), axis=list(range(1, len(mean.shape))))
         return {"loss": kld + bce, "latents": latents, "reconstruction": tf.nn.sigmoid(reconstr), "bce": bce, "kld": kld}
 
     def call(self, inputs):
