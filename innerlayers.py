@@ -189,8 +189,8 @@ class InnerNormalization(InnerLayer):
         self.stored_var = 1
 
     def build(self, input_shape):
-        self.std = self.create_inner_variable("std", (1,), per_step=self.per_step)
-        self.mean = self.create_inner_variable("mean", (1,), per_step=self.per_step)
+        self.std = self.create_inner_variable("std", (input_shape[-1],), per_step=self.per_step)
+        self.mean = self.create_inner_variable("mean", (input_shape[-1],), per_step=self.per_step)
 
     def call_single(self, inputs, batch_index):
         std = self.std.get(batch_index)
@@ -203,7 +203,7 @@ class InnerNormalization(InnerLayer):
         # Then do the single-call normalization since every
         # inner batch has its own mean and std
         if inputs.shape[1] == 5:
-            self.stored_mean, self.stored_var = tf.nn.moments(inputs, axes=[1], keep_dims=True)
+            self.stored_mean, self.stored_var = tf.nn.moments(inputs, axes=[1, 2, 3], keep_dims=True)
         inputs = (inputs - self.stored_mean) / tf.sqrt(self.stored_var + 1e-6)
         return super().call(inputs)
 
