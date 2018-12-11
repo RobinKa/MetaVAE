@@ -61,6 +61,51 @@ class InnerLayer(tf.keras.layers.Layer):
     def call_single(self, inputs, batch_index):
         pass
 
+class InnerDense(InnerLayer):
+    def __init__(self, dim, use_bias=True):
+        super().__init__()
+        self.dim = dim
+        self.use_bias = use_bias
+
+    def build(self, input_shape):
+        self.dense_weights = self.create_inner_variable("weights", (input_shape[-1], self.dim))
+        if self.use_bias:
+            self.bias = self.create_inner_variable("bias", (1,))
+
+    def call_single(self, inputs, batch_index):
+        dense_weights = self.dense_weights.get(batch_index)
+        output = tf.matmul(inputs, dense_weights)
+        if self.use_bias:
+            bias = self.bias.get(batch_index)
+            output += bias
+        return output
+
+    def compute_output_shape(self, input_shape):
+        if isinstance(input_shape, tf.TensorShape):
+            input_shape = input_shape.as_list()
+
+        output_shape = list(input_shape)
+        output_shape[-1] = self.dim
+
+        return tuple(output_shape)
+
+class InnerReshape(InnerLayer):
+    def __init__(self, shape):
+        super().__init__()
+        self.shape = shape
+
+    def call(self, inputs):
+        output_shape = self.compute_output_shape(inputs.shape)
+        return tf.reshape(inputs, output_shape)
+
+    def compute_output_shape(self, input_shape):
+        if isinstance(input_shape, tf.TensorShape):
+            input_shape = input_shape.as_list()
+
+        batch_sizes = input_shape[0:2]
+        output_shape = [*batch_sizes, *self.shape]
+        return tuple(output_shape)
+
 class InnerConv2D(InnerLayer):
     def __init__(self, filters, kernel_size, strides=(1, 1), use_bias=True, padding="VALID"):
         super().__init__()
