@@ -26,6 +26,20 @@ class OuterNetwork:
         
         self.output_size = index
         self.num_inner_loops = num_inner_loops
+        self.slice_cache = {}
+
+    def _get_cached(self, shape, start_index):
+        def _make_sane(x):
+            if isinstance(x, tf.Dimension):
+                x = x.value
+            return int(x)
+        sane_start_index = _make_sane(start_index)
+        if not sane_start_index in self.slice_cache:
+            print("Not in cache")
+            end_index = start_index + np.prod(shape)
+            self.slice_cache[sane_start_index] = tf.reshape(self.output[:, start_index:end_index], (self.output.shape.as_list()[0], *shape))
+
+        return self.slice_cache[sane_start_index]
 
     def get_inner_variable(self, inner_variable, step):
         """
@@ -34,19 +48,16 @@ class OuterNetwork:
         [OuterBatchSize, *VariableShape]
         """
         assert self.output is not None and step >= 0 and step <= self.num_inner_loops
-
-        outer_batch_size = tf.shape(self.output)[0]
         start_index = self.inner_var_index[inner_variable][step]
-        end_index = start_index + np.prod(inner_variable.shape)
-        return tf.reshape(self.output[:, start_index:end_index], (outer_batch_size, *inner_variable.shape))
+        return self._get_cached(inner_variable.shape, start_index)
 
     def get_learning_rate(self, inner_variable, step):
         assert self.output is not None and not inner_variable.per_step and step >= 0 and step < self.num_inner_loops
 
         if self.fixed_lr is None:
-            outer_batch_size = tf.shape(self.output)[0]
             index = self.inner_var_lr_index[inner_variable] + step
-            return tf.reshape(self.output[:, index], (outer_batch_size, *([1] * len(inner_variable.shape))))
+            shape = (1,) * len(inner_variable.shape)
+            return self._get_cached(shape, index)
         else:
             return self.fixed_lr
 
