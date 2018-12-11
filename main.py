@@ -8,7 +8,7 @@ def model_fn(features, labels, mode, params, config):
     inputs = features
     inputs.set_shape((params.outer_batch_size, *inputs.shape[1:]))
 
-    model = MetaVAE(num_inner_loops=params.num_inner_loops)
+    model = MetaVAE(num_inner_loops=params.num_inner_loops, first_order=params.first_order)
 
     loss = model.get_loss(inputs[:, :params.inner_train_size], inputs[:, params.inner_train_size:])
 
@@ -69,6 +69,8 @@ def main():
     args.add_argument("-m", "--model_path", type=str, default="models", help="Estimator model path. Will load existing models. Also saves tensorboard summaries to the same directory.")
     args.add_argument("-il", "--num_inner_loops", type=int, default=5, help="Number of inner network optimization steps.")
     args.add_argument("-olr", "--outer_learning_rate", type=float, default=0.001, help="Learning rate for the outer network.")
+    args.add_argument("-f", "--first_order", dest="first_order", action="store_true", help="Use first order approximation for outer gradients.")
+    args.set_defaults(first_order=False)
     params = args.parse_args()
 
     print("Params:", params)

@@ -4,8 +4,9 @@ import innerlayers as il
 from networks import OuterConvNetwork, OuterConstantNetwork, InnerVAE
 
 class MetaVAE:
-    def __init__(self, num_inner_loops=5):
+    def __init__(self, num_inner_loops=5, first_order=False):
         self.num_inner_loops = num_inner_loops
+        self.first_order = first_order
 
         # Zero variables
         self.input_shape = None
@@ -105,7 +106,7 @@ class MetaVAE:
                 lr = self.outer_network.get_learning_rate(inner_var, step)
                 assert not inner_var.per_step
                 if grads is not None:
-                    mutable_inner_vars[inner_var] = weights - lr * grads
+                    mutable_inner_vars[inner_var] = weights - lr * (tf.stop_gradient(grads) if self.first_order else grads)
                 else:
                     raise Exception("Grads none for %s (tensor: %s) (unused inner variable?)" % (inner_var.name, weights))
 
