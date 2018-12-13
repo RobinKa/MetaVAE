@@ -1,6 +1,6 @@
 import tensorflow as tf
-import innerlayers as il
-from outernetwork import OuterNetwork
+import inner as il
+from outer import OuterNetwork
 
 class OuterConstantNetwork(OuterNetwork):
     def __init__(self, inner_variables, num_inner_loops, fixed_lr=None):
@@ -65,33 +65,43 @@ class InnerVAEEncoder(tf.keras.layers.Layer):
         self.layers = []
 
         self.down_convs = tf.keras.models.Sequential([
-            il.InnerConv2D(32, 2, (1, 1), use_bias=False),
+            il.InnerConv2D(32, 3, (2, 2), padding="SAME", use_bias=False),
             il.InnerNormalization(),
             tf.keras.layers.LeakyReLU(0.2),
-            # (32 - 2) + 1 = 31
+            # 64
 
-            il.InnerConv2D(32, 3, (2, 2), use_bias=False),
+            il.InnerConv2D(32, 3, (2, 2), padding="SAME", use_bias=False),
             il.InnerNormalization(),
             tf.keras.layers.LeakyReLU(0.2),
-            # (31 - 3) / 2 + 1 = 15
+            # 32
 
-            il.InnerConv2D(32, 3, (2, 2), use_bias=False),
+            il.InnerConv2D(32, 3, (2, 2), padding="SAME", use_bias=False),
             il.InnerNormalization(),
             tf.keras.layers.LeakyReLU(0.2),
-            # (15 - 3) / 2 + 1 = 7
+            # 16
 
-            il.InnerConv2D(32, 3, (2, 2), use_bias=False),
+            il.InnerConv2D(32, 3, (2, 2), padding="SAME", use_bias=False),
             il.InnerNormalization(),
             tf.keras.layers.LeakyReLU(0.2),
-            # (7 - 3) / 2 + 1 = 3
+            # 8
 
-            il.InnerConv2D(32, 3, (1, 1), use_bias=False),
+            il.InnerConv2D(32, 3, (2, 2), padding="SAME", use_bias=False),
             il.InnerNormalization(),
             tf.keras.layers.LeakyReLU(0.2),
-            # (3 - 3) / 2 + 1 = 1
+            # 4
+
+            il.InnerConv2D(32, 3, (2, 2), padding="SAME", use_bias=False),
+            il.InnerNormalization(),
+            tf.keras.layers.LeakyReLU(0.2),
+            # 2
+
+            il.InnerConv2D(32, 2, (1, 1), padding="VALID", use_bias=False),
+            il.InnerNormalization(),
+            tf.keras.layers.LeakyReLU(0.2),
+            # 1
 
             il.InnerReshape((32,)),
-            il.InnerDense(20)
+            il.InnerDense(32)
         ])
 
         self.layers.append(self.down_convs)
@@ -115,23 +125,31 @@ class InnerVAEDecoder(tf.keras.layers.Layer):
             il.InnerNormalization(),
             tf.keras.layers.LeakyReLU(0.2),
             
-            il.InnerConv2DTranspose(32, 3, (1, 1), use_bias=False),
+            il.InnerConv2DTranspose(32, 2, (1, 1), padding="VALID", use_bias=False),
             il.InnerNormalization(),
             tf.keras.layers.LeakyReLU(0.2),
 
-            il.InnerConv2DTranspose(32, 3, (2, 2), use_bias=False),
+            il.InnerConv2DTranspose(32, 3, (2, 2), padding="SAME", use_bias=False),
             il.InnerNormalization(),
             tf.keras.layers.LeakyReLU(0.2),
 
-            il.InnerConv2DTranspose(32, 3, (2, 2), use_bias=False),
+            il.InnerConv2DTranspose(32, 3, (2, 2), padding="SAME", use_bias=False),
             il.InnerNormalization(),
             tf.keras.layers.LeakyReLU(0.2),
 
-            il.InnerConv2DTranspose(32, 3, (2, 2), use_bias=False),
+            il.InnerConv2DTranspose(32, 3, (2, 2), padding="SAME", use_bias=False),
             il.InnerNormalization(),
             tf.keras.layers.LeakyReLU(0.2),
 
-            il.InnerConv2DTranspose(output_channels, 2, (1, 1), use_bias=True),
+            il.InnerConv2DTranspose(32, 3, (2, 2), padding="SAME", use_bias=False),
+            il.InnerNormalization(),
+            tf.keras.layers.LeakyReLU(0.2),
+
+            il.InnerConv2DTranspose(32, 3, (2, 2), padding="SAME", use_bias=False),
+            il.InnerNormalization(),
+            tf.keras.layers.LeakyReLU(0.2),
+
+            il.InnerConv2DTranspose(output_channels, 3, (2, 2), padding="SAME", use_bias=True),
         ])
 
         self.layers.append(self.up_convs)

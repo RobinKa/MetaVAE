@@ -49,6 +49,7 @@ class InnerLayer(tf.keras.layers.Layer):
         if name in self.inner_variables:
             raise Exception("Tried to create inner variable with existing name")
         self.inner_variables[name] = InnerVariable(shape=shape, dtype=dtype, per_step=per_step)
+        print("Inner var %s: %s" % (self.inner_variables[name].name, name))
         return self.inner_variables[name]
 
     def call(self, inputs):
@@ -70,7 +71,7 @@ class InnerDense(InnerLayer):
     def build(self, input_shape):
         self.dense_weights = self.create_inner_variable("weights", (input_shape[-1], self.dim))
         if self.use_bias:
-            self.bias = self.create_inner_variable("bias", (1,))
+            self.bias = self.create_inner_variable("bias", (self.dim,))
 
     def call_single(self, inputs, batch_index):
         dense_weights = self.dense_weights.get(batch_index)
@@ -132,13 +133,19 @@ class InnerConv2D(InnerLayer):
         if isinstance(input_shape, tf.TensorShape):
             input_shape = input_shape.as_list()
 
-        # TODO: Correct padding values
-        padding = (0, 0) if self.padding == "VALID" else (1000, 1000)
+        if self.padding == "VALID":
+            padding = (0, 0)
+        elif self.padding == "SAME":
+            padding = (self.kernel_size[0] - self.strides[1], self.kernel_size[1] - self.strides[2])
+        else:
+            raise Exception("Unsupported padding type %s" % self.padding)
 
         output_shape = list(input_shape)
-        output_shape[-3] = (input_shape[-3] - self.kernel_size[0] + 2 * padding[0]) // self.strides[1] + 1
-        output_shape[-2] = (input_shape[-2] - self.kernel_size[1] + 2 * padding[1]) // self.strides[2] + 1
+        output_shape[-3] = (input_shape[-3] - self.kernel_size[0] + padding[0]) // self.strides[1] + 1
+        output_shape[-2] = (input_shape[-2] - self.kernel_size[1] + padding[1]) // self.strides[2] + 1
         output_shape[-1] = self.filters
+
+        print("Conv shape:", output_shape)
 
         return tuple(output_shape)
 
@@ -171,13 +178,19 @@ class InnerConv2DTranspose(InnerLayer):
         if isinstance(input_shape, tf.TensorShape):
             input_shape = input_shape.as_list()
 
-        # TODO: Correct padding values
-        padding = (0, 0) if self.padding == "VALID" else (1000, 1000)
+        if self.padding == "VALID":
+            padding = (0, 0)
+        elif self.padding == "SAME":
+            padding = (self.kernel_size[0] - self.strides[1], self.kernel_size[1] - self.strides[2])
+        else:
+            raise Exception("Unsupported padding type %s" % self.padding)
 
         output_shape = list(input_shape)
-        output_shape[-3] = (input_shape[-3] - 1) * self.strides[1] + self.kernel_size[0] - 2 * padding[0]
-        output_shape[-2] = (input_shape[-2] - 1) * self.strides[2] + self.kernel_size[1] - 2 * padding[1]
+        output_shape[-3] = (input_shape[-3] - 1) * self.strides[1] + self.kernel_size[0] - padding[0]
+        output_shape[-2] = (input_shape[-2] - 1) * self.strides[2] + self.kernel_size[1] - padding[1]
         output_shape[-1] = self.filters
+
+        print("Conv transpose shape:", output_shape)
         
         return tuple(output_shape)
 
@@ -195,6 +208,7 @@ class InnerNormalization(InnerLayer):
     def call_single(self, inputs, batch_index):
         std = self.std.get(batch_index) + 1
         mean = self.mean.get(batch_index)
+        #print("Called normalization with std and mean", self.std.name, self.mean.name, std, mean)
         output = std * inputs + mean
         return output
 

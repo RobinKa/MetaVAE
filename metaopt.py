@@ -1,7 +1,7 @@
 import tensorflow as tf
 import numpy as np
-import innerlayers as il
-from networks import OuterConvNetwork, OuterConstantNetwork, InnerVAE
+import inner as il
+from networks import OuterConvNetwork, OuterConstantNetwork, OuterLinearNetwork, InnerVAE
 
 class MetaVAE:
     def __init__(self, num_inner_loops=5, first_order=False):

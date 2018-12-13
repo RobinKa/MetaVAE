@@ -1,6 +1,6 @@
 import tensorflow as tf
 import numpy as np
-import innerlayers as il
+import inner as il
 
 class OuterNetwork:
     def __init__(self, inner_variables, num_inner_loops, fixed_lr=None):
