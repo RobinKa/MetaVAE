@@ -1,19 +1,24 @@
 import tensorflow as tf
 import numpy as np
 from metaopt import MetaVAE
-from data import load_images_by_directories
+from data import get_image_paths_by_directories, load_image
 import argparse
 
 def model_fn(features, labels, mode, params, config):
     inputs = features
     inputs.set_shape((params.outer_batch_size, *inputs.shape[1:]))
+    inputs = tf.stop_gradient(inputs)
 
-    model = MetaVAE(num_inner_loops=params.num_inner_loops, first_order=params.first_order)
+    model = MetaVAE(num_inner_loops=params.num_inner_loops, first_order=params.first_order, adjust_loss=False)
 
     loss = model.get_loss(inputs[:, :params.inner_train_size], inputs[:, params.inner_train_size:])
 
     if mode == tf.estimator.ModeKeys.TRAIN:
-        train_op = tf.train.AdamOptimizer(params.outer_learning_rate).minimize(loss, global_step=tf.train.get_global_step())
+        lr = tf.train.cosine_decay(params.outer_learning_rate, tf.train.get_global_step(), 5000 * 150, params.outer_learning_rate / 10)
+        opt = tf.train.AdamOptimizer(lr)
+        gvs = opt.compute_gradients(loss)
+        gvs = [(tf.clip_by_value(grad, -10, 10), var) for grad, var in gvs]
+        train_op = opt.apply_gradients(gvs, global_step=tf.train.get_global_step())
     else:
         train_op = None
 
@@ -26,20 +31,24 @@ def model_fn(features, labels, mode, params, config):
 
 def get_input_fn(path, batch_size, images_per_batch, steps=100000000):
     print("Loading images from", path)
-    images_by_label = load_images_by_directories(path, images_per_batch, target_size=(32, 32, 3))
-    image_shape = images_by_label[0][0].shape
-    num_labels = len(images_by_label)
-    print("Loaded", num_labels, "labels and a total of", sum([len(im) for im in images_by_label]), "images")
+    image_shape = (32, 32, 1)
+    image_paths_by_label = get_image_paths_by_directories(path, images_per_batch, target_size=image_shape)
+    num_labels = len(image_paths_by_label)
+    print("Loaded", num_labels, "labels and a total of", sum([len(im_paths) for im_paths in image_paths_by_label]), "images")
     print("Image shape:", image_shape)
-    print("Min / max:", np.min(images_by_label[0]), np.max(images_by_label[0]))
 
     def _get_batch():
         chosen_label = np.random.randint(num_labels)
-        label_images = images_by_label[chosen_label]
-        chosen_indices = np.random.choice(np.arange(len(label_images)), size=images_per_batch, replace=False)
-        images = label_images[chosen_indices]
+        label_image_paths = image_paths_by_label[chosen_label]
+        #chosen_indices = np.random.choice(np.arange(len(label_images)), size=images_per_batch, replace=False)
+        #chosen_indices = np.arange(images_per_batch)
+        chosen_indices = np.random.choice(np.arange(images_per_batch), size=images_per_batch, replace=False)
+        image_paths = [label_image_paths[index] for index in chosen_indices]
+        images = np.array([load_image((path, image_shape)) for path in image_paths])
+
         if len(images.shape) == 3:
             images = np.expand_dims(images, -1)
+
         return images
 
     def input_fn():
@@ -52,7 +61,7 @@ def get_input_fn(path, batch_size, images_per_batch, steps=100000000):
         dataset = tf.data.Dataset.from_tensor_slices(dummy)
         dataset = dataset.map(f)
         dataset = dataset.batch(batch_size)
-        dataset = dataset.prefetch(2)
+        dataset = dataset.prefetch(8)
 
         print("Dataset:", dataset)
         return dataset

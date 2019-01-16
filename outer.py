@@ -4,6 +4,7 @@ import inner as il
 
 class OuterNetwork:
     def __init__(self, inner_variables, num_inner_loops, fixed_lr=None):
+        self.inner_variables = inner_variables
         self.fixed_lr = fixed_lr
         self.output = None
         self.inner_var_index = {}
